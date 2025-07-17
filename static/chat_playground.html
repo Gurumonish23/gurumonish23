@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Chat Interface</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/github.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/highlight.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #2c3e50; /* Navy blue */
+      --secondary-color: #f39c12; /* Golden orange */
+      --bg-color: #ecf0f1; /* Off-white/light grey */
+      --light-gray: #bdc3c7;
+      --dark-gray: #7f8c8d;
+      --user-msg-color: #fdfdca; /* Pale yellow */
+      --ai-msg-color: #ffffff;
+      --planning-color: #f8f0e3; /* Light cream */
+      --tool-color: #e8f6f3; /* Light mint */
+      --sidebar-width: 280px;
+      --sidebar-collapsed-width: 40px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Left Sidebar for Downloads */
+    .left-sidebar {
+      width: 280px;
+      background-color: white;
+      height: 100vh;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+      transition: width 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 10;
+    }
+
+    .left-sidebar.collapsed {
+      width: 40px;
+    }
+
+    .toggle-sidebar {
+      position: absolute;
+      right: -15px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 30px;
+      height: 30px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 100;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle-sidebar svg {
+      width: 16px;
+      height: 16px;
+      transition: transform 0.3s;
+    }
+
+    .left-sidebar.collapsed .toggle-sidebar svg {
+      transform: rotate(180deg);
+    }
+
+    .downloads-header {
+      padding: 15px;
+      background-color: var(--primary-color);
+      color: white;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+    }
+
+    .downloads-icon {
+      margin-right: 10px;
+      font-size: 18px;
+    }
+
+    .download-container {
+      flex-grow: 1;
+      padding: 15px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .download-list {
+      list-style: none;
+      margin-top: 10px;
+      overflow-y: auto;
+    }
+
+    .download-list li {
+      padding: 12px 15px;
+      margin-bottom: 8px;
+      background-color: var(--light-gray);
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+
+    .download-list li:hover {
+      background-color: #e0e0e0;
+    }
+
+    .download-list .download-link {
+      display: flex;
+      align-items: center;
+      color: var(--primary-color);
+      text-decoration: none;
+      width: 100%;
+    }
+
+    .download-list .download-icon {
+      margin-right: 10px;
+      color: var(--secondary-color);
+    }
+
+    .no-downloads {
+      color: var(--dark-gray);
+      font-style: italic;
+      text-align: center;
+      padding: 20px;
+    }
+
+    /* Hide text content when sidebar is collapsed */
+    .left-sidebar.collapsed .downloads-header span,
+    .left-sidebar.collapsed .download-container {
+      display: none;
+    }
+
+    /* Main Content Area */
+    .main-content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      transition: margin-left 0.3s ease;
+    }
+
+    .container {
+      display: flex;
+      height: calc(100vh - 40px);
+      gap: 20px;
+      width: 100%;
+    }
+
+    .chat-container {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .intermediate-steps {
+      background-color: white;
+      border-radius: 10px;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 15px;
+      background-color: var(--primary-color);
+      color: white;
+      font-weight: bold;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .chat-messages {
+      flex-grow: 1;
+      padding: 15px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 10px 15px;
+      border-radius: 15px;
+      position: relative;
+      line-height: 1.5;
+    }
+
+    .message pre {
+      white-space: pre-wrap;
+      background-color: #f5f5f5;
+      padding: 8px;
+      border-radius: 5px;
+      margin-top: 5px;
+      overflow-x: auto;
+    }
+
+    .message code {
+      background-color: #f5f5f5;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+
+    .user {
+      align-self: flex-end;
+      background-color: var(--user-msg-color);
+      border-bottom-right-radius: 4px;
+    }
+
+    .ai {
+      align-self: flex-start;
+      background-color: var(--ai-msg-color);
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .timestamp {
+      font-size: 11px;
+      color: var(--dark-gray);
+      margin-top: 5px;
+      text-align: right;
+    }
+
+    .input-area {
+      display: flex;
+      flex-direction: column;
+      padding: 15px;
+      border-top: 1px solid #e0e0e0;
+      background-color: white;
+    }
+
+    .message-input-row {
+      display: flex;
+      position: relative;
+    }
+
+    .input-area textarea {
+      flex-grow: 1;
+      border: 1px solid #e0e0e0;
+      border-radius: 20px;
+      padding: 10px 15px;
+      padding-right: 80px; /* Space for buttons */
+      resize: none;
+      outline: none;
+      height: 50px;
+      font-size: 14px;
+    }
+
+    .input-actions {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      gap: 8px;
+    }
+
+    .upload-button {
+      background-color: var(--light-gray);
+      color: var(--dark-gray);
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s;
+    }
+
+    .upload-button:hover {
+      background-color: #e0e0e0;
+    }
+
+    .send-button {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .send-button:hover {
+      background-color: #2980b9;
+    }
+
+    .input-actions button svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* File list area */
+    .file-list-area {
+      margin-top: 10px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .file-list-area.active {
+      max-height: 200px;
+      margin-bottom: 10px;
+    }
+
+    .file-list {
+      list-style: none;
+      max-height: 150px;
+      overflow-y: auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 5px;
+    }
+
+    .file-list li {
+      padding: 6px 10px;
+      background-color: var(--light-gray);
+      border-radius: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      max-width: 200px;
+    }
+
+    .file-list li.uploaded {
+      background-color: #e8f5e9;
+      border-left: 3px solid var(--secondary-color);
+    }
+
+    .file-list .upload-status {
+      color: var(--secondary-color);
+      font-weight: bold;
+      margin-right: 5px;
+    }
+
+    .file-list .file-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      max-width: 150px;
+    }
+
+    .file-list button {
+      background: none;
+      border: none;
+      color: #e74c3c;
+      cursor: pointer;
+      margin-left: 5px;
+      font-size: 10px;
+      padding: 2px;
+    }
+
+    .upload-files-button {
+      padding: 8px 15px;
+      background-color: var(--secondary-color);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      font-size: 13px;
+      align-self: flex-start;
+      margin-top: 5px;
+    }
+
+    .upload-files-button:hover {
+      background-color: #27ae60;
+    }
+
+    .upload-files-button:disabled {
+      background-color: #95a5a6;
+      cursor: not-allowed;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .steps-container {
+      flex-grow: 1;
+      padding: 15px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .step {
+      border-radius: 8px;
+      background-color: var(--tool-color);
+      font-size: 13px;
+      border-left: 3px solid var(--primary-color);
+      margin-bottom: 8px;
+    }
+
+    .step.planning {
+      background-color: var(--planning-color);
+      border-left-color: #9b59b6;
+    }
+
+    .step.error {
+      background-color: #ffe6e6;
+      border-left-color: #e74c3c;
+    }
+
+    .step-header {
+      padding: 8px 12px;
+      background-color: rgba(0, 0, 0, 0.05);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .step-header:hover {
+      background-color: rgba(0, 0, 0, 0.08);
+    }
+
+    .step-preview {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      margin-right: 10px;
+      font-weight: 500;
+    }
+
+    .step-toggle {
+      color: var(--dark-gray);
+      font-size: 16px;
+      transition: transform 0.3s;
+    }
+
+    .step.expanded .step-toggle {
+      transform: rotate(180deg);
+    }
+
+    .step-content {
+      display: none;
+      padding: 10px 12px;
+      white-space: pre-wrap;
+      border-top: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .step.expanded .step-content {
+      display: block;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .typing-indicator {
+      display: flex;
+      padding: 10px 15px;
+      background-color: white;
+      border-radius: 15px;
+      align-self: flex-start;
+      margin-bottom: 15px;
+    }
+
+    .typing-indicator span {
+      height: 10px;
+      width: 10px;
+      margin: 0 1px;
+      background-color: #9e9ea1;
+      border-radius: 50%;
+      display: inline-block;
+      animation: bounce 1.5s infinite ease-in-out;
+    }
+
+    .typing-indicator span:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+
+    .typing-indicator span:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+
+    /* Add near the bottom of your <style> */
+    .follow-up-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 15px;
+      background-color: #fafafa;
+      border-top: 1px solid var(--light-gray);
+    }
+    .follow-up-button {
+      background-color: var(--secondary-color);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .follow-up-button:hover {
+      background-color: #d68910;
+    }
+
+    @keyframes bounce {
+      0%, 80%, 100% { 
+        transform: scale(0);
+      } 40% { 
+        transform: scale(1.0);
+      }
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    /* Pulse animation for notification */
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(243, 156, 18, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(243, 156, 18, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(243, 156, 18, 0); }
+    }
+
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+
+      .message {
+        max-width: 90%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Left Sidebar for Downloads -->
+  <div class="left-sidebar" id="leftSidebar">
+    <button class="toggle-sidebar" id="toggleSidebar">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <div class="downloads-header">
+      <span class="downloads-icon">⬇️</span>
+      <span>Available Downloads</span>
+    </div>
+    <div class="download-container">
+      <div class="no-downloads" id="noDownloads">No files available for download.</div>
+      <ul class="download-list" id="downloadList"></ul>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="main-content" id="mainContent">
+    <div class="container">
+      <div class="chat-container">
+        <div class="header">
+          AI Assistant
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="message ai">
+            Hello! I'm your AI assistant. I can help you analyze data, answer questions, and more. Feel free to upload files and ask me anything.
+            <div class="timestamp">Just now</div>
+          </div>
+        </div>
+        <div class="typing-indicator hidden" id="typingIndicator">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="input-area">
+          <!-- File list area - appears when files are selected -->
+          <div class="file-list-area" id="fileListArea">
+            <ul class="file-list" id="fileList"></ul>
+            <button type="button" class="upload-files-button" id="uploadButton" onclick="uploadFiles()" disabled>Upload Files</button>
+          </div>
+          
+          <div class="message-input-row">
+            <textarea id="userInput" placeholder="Type your message here..." onkeydown="if(event.keyCode === 13 && !event.shiftKey) { event.preventDefault(); sendMessage(); }"></textarea>
+            <div class="input-actions">
+              <input type="file" id="fileInput" class="file-input" multiple onchange="handleFileSelect(event)" />
+              <button class="upload-button" onclick="document.getElementById('fileInput').click()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </button>
+              <button class="send-button" onclick="sendMessage()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="intermediate-steps">
+          <div class="header">
+            Assistant's Reasoning &amp; Steps
+          </div>
+          <div class="steps-container" id="stepsContainer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+    <!-- In the head section -->
+  <script>
+    // Store the selected files and uploaded files
+    let selectedFiles = [];
+    let uploadedFiles = [];
+    const typingIndicator = document.getElementById('typingIndicator');
+    const fileListArea = document.getElementById('fileListArea');
+    let socket = null;
+    let isConnected = false;
+    
+    // Sidebar toggle functionality
+    const leftSidebar = document.getElementById('leftSidebar');
+    const mainContent = document.getElementById('mainContent');
+    const toggleSidebar = document.getElementById('toggleSidebar');
+    
+    toggleSidebar.addEventListener('click', function() {
+      leftSidebar.classList.toggle('collapsed');
+    });
+    
+    // Connect WebSocket
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/playground`;
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        console.log('WebSocket connection established');
+        isConnected = true;
+      };
+
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        processMessage(data);
+      };
+
+      socket.onclose = () => {
+        console.log('WebSocket connection closed');
+        isConnected = false;
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      socket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+    }
+
+    connectWebSocket();
+
+    // Handle file selection
+    function handleFileSelect(event) {
+      const files = event.target.files;
+      const fileInput = document.getElementById('fileInput');
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!isFileInList(file.name)) {
+          selectedFiles.push(file);
+          addFileToList(file, false);
+        }
+      }
+      fileInput.value = '';
+      document.getElementById('uploadButton').disabled = selectedFiles.length === 0;
+      
+      // Show file list area if files are selected
+      if (selectedFiles.length > 0) {
+        fileListArea.classList.add('active');
+      }
+    }
+
+    function isFileInList(fileName) {
+      return selectedFiles.some(f => f.name === fileName) || 
+             uploadedFiles.some(f => f.name === fileName);
+    }
+
+    function addFileToList(file, isUploaded = false) {
+      const fileList = document.getElementById('fileList');
+      const li = document.createElement('li');
+      li.dataset.filename = file.name;
+      if (isUploaded) li.classList.add('uploaded');
+      li.innerHTML = `
+        <span class="file-name">
+          ${isUploaded ? '<span class="upload-status">✓</span>' : ''} 
+          ${file.name} (${formatFileSize(file.size || 0)})
+        </span>
+        <button type="button" onclick="removeFile('${file.name}')">✕</button>
+      `;
+      fileList.appendChild(li);
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function removeFile(fileName) {
+      const selectedIndex = selectedFiles.findIndex(f => f.name === fileName);
+      if (selectedIndex !== -1) selectedFiles.splice(selectedIndex, 1);
+      const uploadedIndex = uploadedFiles.findIndex(f => f.name === fileName);
+      if (uploadedIndex !== -1) uploadedFiles.splice(uploadedIndex, 1);
+      const fileElement = document.querySelector(`#fileList li[data-filename="${fileName}"]`);
+      if (fileElement) fileElement.remove();
+      
+      document.getElementById('uploadButton').disabled = selectedFiles.length === 0;
+      
+      // Hide file list area if no files are selected
+      if (selectedFiles.length === 0 && uploadedFiles.length === 0) {
+        fileListArea.classList.remove('active');
+      }
+    }
+
+    async function uploadFiles() {
+      if (selectedFiles.length === 0) return;
+      const uploadButton = document.getElementById('uploadButton');
+      uploadButton.disabled = true;
+      uploadButton.innerText = 'Uploading...';
+      const formData = new FormData();
+      for (const file of selectedFiles) {
+        formData.append('files', file);
+      }
+      
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!response.ok) throw new Error('Upload failed');
+        const result = await response.json();
+        for (const file of selectedFiles) {
+          const fileElement = document.querySelector(`#fileList li[data-filename="${file.name}"]`);
+          if (fileElement) {
+            fileElement.classList.add('uploaded');
+            if (!fileElement.querySelector('.upload-status')) {
+              const nameSpan = fileElement.querySelector('.file-name');
+              nameSpan.innerHTML = `<span class="upload-status">✓</span> ${nameSpan.innerHTML.replace('<span class="upload-status">✓</span> ', '')}`;
+            }
+          }
+          uploadedFiles.push(file);
+        }
+        selectedFiles = [];
+        uploadButton.innerText = 'Upload Files';
+        uploadButton.disabled = true;
+        addStep(`Files uploaded successfully: ${result.uploaded_files.map(f => f.split('\\').pop().split('/').pop()).join(', ')}`, 'normal');
+      } catch (error) {
+        console.error('Upload error:', error);
+        addStep(`Error uploading files: ${error.message}`, 'error');
+        uploadButton.innerText = 'Upload Files';
+        uploadButton.disabled = false;
+      }
+    }
+
+    function handleDownloadsAvailable(files) {
+      const downloadList = document.getElementById('downloadList');
+      const noDownloads = document.getElementById('noDownloads');
+      
+      // Clear the list
+      downloadList.innerHTML = '';
+      
+      if (files.length === 0) {
+        noDownloads.style.display = 'block';
+        return;
+      }
+      
+      noDownloads.style.display = 'none';
+      
+      // Add each file to the downloads list
+      files.forEach(filename => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <a href="/download/${encodeURIComponent(filename)}" class="download-link" download>
+            <span class="download-icon">⬇️</span>
+            ${filename}
+          </a>
+        `;
+        downloadList.appendChild(li);
+        
+        // If there are downloads and sidebar is collapsed, give a visual indicator
+        if (leftSidebar.classList.contains('collapsed')) {
+          toggleSidebar.classList.add('pulse');
+          setTimeout(() => toggleSidebar.classList.remove('pulse'), 3000);
+        }
+      });
+    }
+
+    function updateFileListFromContext(fileListText) {
+      console.log("Updating file list from context:", fileListText);
+      let filePaths = [];
+      if (fileListText.includes('Uploaded files:')) {
+        const filesText = fileListText.split('Uploaded files:')[1].trim();
+        filePaths = filesText.split(', ');
+      }
+      uploadedFiles = [];
+      if (filePaths.length > 0 && filePaths[0] !== '') {
+        for (const path of filePaths) {
+          const fileName = path.split('\\').pop().split('/').pop();
+          if (!uploadedFiles.some(f => f.name === fileName)) {
+            uploadedFiles.push({
+              name: fileName,
+              path: path,
+              size: 0
+            });
+          }
+        }
+      }
+      refreshFileListDisplay();
+    }
+
+    function refreshFileListDisplay() {
+      const fileListElement = document.getElementById('fileList');
+      fileListElement.innerHTML = '';
+      
+      if (uploadedFiles.length > 0 || selectedFiles.length > 0) {
+        fileListArea.classList.add('active');
+      } else {
+        fileListArea.classList.remove('active');
+      }
+      
+      for (const file of uploadedFiles) {
+        addFileToList(file, true);
+      }
+      for (const file of selectedFiles) {
+        if (!uploadedFiles.some(f => f.name === file.name)) {
+          addFileToList(file, false);
+        }
+      }
+    }
+
+    function sendMessage() {
+      const inputElement = document.getElementById('userInput');
+      const message = inputElement.value.trim();
+      if (!message || !isConnected) return;
+      inputElement.value = '';
+      addMessage(message, 'user');
+      typingIndicator.classList.remove('hidden');
+      socket.send(JSON.stringify({ content: message }));
+    }
+
+    function addFollowUpSuggestions(content) {
+      // 1) find the last AI bubble
+      const chat = document.getElementById('chatMessages');
+      const aiBubbles = chat.querySelectorAll('.message.ai');
+      const lastAi = aiBubbles[aiBubbles.length - 1];
+      if (!lastAi) return;
+    
+      // 2) remove any previous follow-up containers
+      const old = chat.querySelector('.follow-up-container');
+      if (old) old.remove();
+    
+      // 3) build a new container
+      const container = document.createElement('div');
+      container.className = 'follow-up-container';
+    
+      // 4) populate it
+      const questions = Array.isArray(content)
+        ? content
+        : content.split(/\r?\n/).map(l => l.replace(/^[\d\.\-\u2022]+\s*/, '').trim()).filter(Boolean);
+    
+      questions.forEach(q => {
+        const btn = document.createElement('button');
+        btn.className = 'follow-up-button';
+        btn.textContent = q;
+        btn.onclick = () => {
+          document.getElementById('userInput').value = q;
+          sendMessage();
+          container.remove();
+        };
+        container.appendChild(btn);
+      });
+    
+      // 5) insert it immediately *after* the last AI bubble
+      lastAi.insertAdjacentElement('afterend', container);
+    }
+
+    function processMessage(data) {
+      console.log('Received message:', data);
+      if (data.type === 'ai_response') {
+        typingIndicator.classList.add('hidden');
+        addMessage(data.content, 'ai');
+        scrollToBottom();
+      } else if (data.type === 'followup_questions') {
+        typingIndicator.classList.add('hidden');
+        addFollowUpSuggestions(data.content);
+      } else if (data.type === 'intermediate_step') {
+        if (data.content.startsWith('Updated context: Here are the uploaded files list:')) {
+          const fileListText = data.content.replace('Updated context: ', '');
+          updateFileListFromContext(fileListText);
+        }
+        let stepType = 'normal';
+        if (data.content.startsWith('Planning:')) stepType = 'planning';
+        addStep(data.content, stepType);
+      } else if (data.type === 'error') {
+        typingIndicator.classList.add('hidden');
+        addStep(data.message, 'error');
+      } else if (data.type === 'downloads_available') {
+        // Handle downloads available message
+        handleDownloadsAvailable(data.files);
+      }
+    }
+
+    // Also update the addMessage function to use marked:
+    function addMessage(content, sender) {
+      const chatMessages = document.getElementById('chatMessages');
+      const messageElement = document.createElement('div');
+      messageElement.className = `message ${sender}`;
+      
+      // Use marked to render the message content
+      if (sender === 'ai') {
+        messageElement.innerHTML = `
+          ${marked.parse(content)}
+          <div class="timestamp">${formatTime(new Date())}</div>
+        `;
+      } else {
+        // For user messages, we might want simpler formatting
+        messageElement.innerHTML = `
+          ${content.replace(/\n/g, '<br>')}
+          <div class="timestamp">${formatTime(new Date())}</div>
+        `;
+      }
+      
+      chatMessages.appendChild(messageElement);
+      scrollToBottom();
+    }
+
+    // Markdown helper for steps (reasoning) container
+    function formatMarkdown(text) {
+      // Configure marked options for safety and preferences
+      marked.setOptions({
+        breaks: true,           // Convert line breaks to <br>
+        gfm: true,              // GitHub flavored markdown
+        headerIds: false,       // Don't add IDs to headings (safer)
+        mangle: false,          // Don't mangle email addresses
+        sanitize: false,        // Note: This option is deprecated but using DOMPurify below
+        smartLists: true,       // Smarter list behavior
+        smartypants: true,      // Typographic punctuation
+        xhtml: false            // Don't close empty tags with />
+      });
+      
+      // For security, you might want to add DOMPurify
+      return marked.parse(text);
+    }
+    
+
+    // Updated addStep to create collapsible elements with preview
+    function addStep(content, type = 'normal') {
+      const stepsContainer = document.getElementById('stepsContainer');
+      
+      // Create step container
+      const stepElement = document.createElement('div');
+      stepElement.className = `step ${type}`;
+      
+      // Create a preview of the content (first 60 characters)
+      const contentText = content.replace(/<[^>]*>/g, '').replace(/\n/g, ' ').trim();
+      const preview = contentText.length > 60 
+        ? contentText.substring(0, 60) + '...' 
+        : contentText;
+      
+      // Create header with preview and toggle button
+      const stepHeader = document.createElement('div');
+      stepHeader.className = 'step-header';
+      stepHeader.innerHTML = `
+        <div class="step-preview">${preview}</div>
+        <div class="step-toggle">▼</div>
+      `;
+      
+      // Create content container
+      const stepContent = document.createElement('div');
+      stepContent.className = 'step-content';
+      stepContent.innerHTML = formatMarkdown(content);
+      
+      // Add event listener to header
+      stepHeader.addEventListener('click', function() {
+        stepElement.classList.toggle('expanded');
+      });
+      
+      // Assemble the step element
+      stepElement.appendChild(stepHeader);
+      stepElement.appendChild(stepContent);
+      
+      // Add to container
+      stepsContainer.appendChild(stepElement);
+      
+      // Auto scroll to bottom
+      stepsContainer.scrollTop = stepsContainer.scrollHeight;
+    }
+
+    function formatTime(date) {
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
+
+    function scrollToBottom() {
+      const chatMessages = document.getElementById('chatMessages');
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // Check for available downloads on page load
+    window.addEventListener('load', async () => {
+      try {
+        // Set initial sidebar state (expanded on desktop, collapsed on mobile)
+        if (window.innerWidth <= 768) {
+          leftSidebar.classList.add('collapsed');
+        }
+        
+        // Check for available downloads
+        const response = await fetch('/downloads');
+        const data = await response.json();
+        if (data.files) {
+          handleDownloadsAvailable(data.files);
+        }
+      } catch (error) {
+        console.error('Error fetching downloads:', error);
+      }
+    });
+  </script>
+</body>
+</html>
